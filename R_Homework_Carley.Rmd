@@ -9,3 +9,347 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+# Load Libraries 
+```{r}
+if (!require("tidyverse")) install.packages("tidyverse")
+library(tidyverse)
+if (!require("ggplot2")) install.packages("ggplot2")
+library(ggplot2)
+if (!require("gtools")) install.packages("gtools")
+library(gtools)
+if (!require("reshape2")) install.packages("reshape2")
+library(reshape2)
+if (!require("httr")) install.packages("httr")
+library(httr)
+
+
+
+```
+
+#Import Data
+```{r}
+SNP <- read_tsv("https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/snp_position.txt")
+Fang <- read_tsv("https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/fang_et_al_genotypes.txt")
+```
+
+# Data Inspection
+```{r}
+view(SNP)
+str(SNP)
+view(Fang)
+str(Fang)
+```
+
+# Make files for future outputs 
+```{r}
+dir.create("Maize")
+dir.create("Teosinte") 
+dir.create("graphs")
+```
+
+## Data Processing
+```{r}
+ShortSNP <- SNP[ ,c(1,3,4)] ##makes new tibble of SNP_ID, Chromosome, and Position
+```
+
+# Process Full Dataset
+```{r}
+transposedFang <- as.data.frame(t(Fang))
+names(transposedFang) <- lapply(transposedFang[1, ], as.character) #Make the sample names the col names
+transposedFang <- transposedFang[-1,] #Remove sample names row
+transposedFang <- rownames_to_column(transposedFang, var="SNP_ID") #Makes a col of the row names 
+mergedFangSNP <- merge(ShortSNP,transposedFang, by.x="SNP_ID", by.y="SNP_ID", all = TRUE)
+```
+
+## Pull Species
+Since 'group' isn't included in the merge each species has to be pulled out first then merged. 
+
+# Maize
+Maize = ZMMIL, ZMMLR, and ZMMMR
+```{r}
+maize <- filter(Fang, Group == "ZMMIL" | Group == "ZMMLR" | Group == "ZMMMR") 
+maize_names <- maize[,c(1:3)]
+maize_names$full <- apply(maize_names, 1, paste, collapse = ", ") #Makes a new col of the full name
+```
+
+# Teosinte
+Teosinte = ZMPBA, ZMPIL, and ZMPJA
+```{r}
+teosinte <- filter(Fang, Group == "ZMPBA" | Group == "ZMPIL" | Group == "ZMPJA")
+teosinte_names <- teosinte[,c(1:3)]
+teosinte_names$full <- apply(teosinte_names, 1, paste, collapse = ", ") #Makes a new col of the full name
+```
+
+# Transpose maize files
+```{r}
+tmaize <- as.data.frame(t(maize[,c(-1:-3)]))
+colnames(tmaize) <- maize_names$full
+rnames <- as.data.frame(rownames(tmaize))
+rownames(tmaize) <- NULL
+tmaize <- cbind(rnames,tmaize)
+colnames(tmaize)[1] <- "SNP_ID"
+```
+
+# Join SNP and maizeFang
+```{r}
+mergedmaize <- inner_join(x = ShortSNP, y = tmaize, by = "SNP_ID")
+```
+
+# Transpose teosinte files
+```{r}
+tteosinte <- as.data.frame(t(teosinte[,c(-1:-3)]))
+colnames(tteosinte) <- teosinte_names$full
+rnames <- as.data.frame(rownames(tteosinte))
+rownames(tteosinte) <- NULL
+tteosinte <- cbind(rnames,tteosinte)
+colnames(tteosinte)[1] <- "SNP_ID"
+```
+
+# Join SNP and teosinteFang
+```{r}
+mteosinte <- inner_join(x = ShortSNP, y = tteosinte, by = "SNP_ID")
+```
+
+## Creating Files for miaze then teosinte
+
+# Sort Maize by increasing 'Position'
+```{r}
+mergedmaize <- mergedmaize[mixedorder(mergedmaize$Position),]
+```
+
+# Create new files for each 'Chromosome'
+```{r}
+maize_chrom01_increase <- filter(mergedmaize, Chromosome == "1") %>% write_csv(path = "Maize/maize_chrom01_increase.csv")
+maize_chrom02_increase <- filter(mergedmaize, Chromosome == "2") %>% write_csv(path = "Maize/maize_chrom02_increase.csv")
+maize_chrom03_increase <- filter(mergedmaize, Chromosome == "3") %>% write_csv(path = "Maize/maize_chrom03_increase.csv")
+maize_chrom04_increase <- filter(mergedmaize, Chromosome == "4") %>% write_csv(path = "Maize/maize_chrom04_increase.csv")
+maize_chrom05_increase <- filter(mergedmaize, Chromosome == "5") %>% write_csv(path = "Maize/maize_chrom05_increase.csv")
+maize_chrom06_increase <- filter(mergedmaize, Chromosome == "6") %>% write_csv(path = "Maize/maize_chrom06_increase.csv")
+maize_chrom07_increase <- filter(mergedmaize, Chromosome == "7") %>% write_csv(path = "Maize/maize_chrom07_increase.csv")
+maize_chrom08_increase <- filter(mergedmaize, Chromosome == "8") %>% write_csv(path = "Maize/maize_chrom08_increase.csv")
+maize_chrom09_increase <- filter(mergedmaize, Chromosome == "9") %>% write_csv(path = "Maize/maize_chrom09_increase.csv")
+maize_chrom10_increase <- filter(mergedmaize, Chromosome == "10") %>% write_csv(path = "Maize/maize_chrom10_increase.csv")
+```
+
+# Sort Maize by decreasing 'Position'
+```{r}
+mergedmaize <- mergedmaize[mixedorder(mergedmaize$Position, decreasing = T),]
+```
+
+# Replace ?/? with -/-
+```{r}
+mergedmaize <- apply(X = mergedmaize, MARGIN = 2, FUN = as.character)
+mergedmaize[mergedmaize == "?/?"] <- "-/-"
+mergedmaize <- as.data.frame(mergedmaize)
+```
+
+# Create new files for each 'Chromosome'
+```{r}
+maize_chrom01_decrease <- filter(mergedmaize, Chromosome == "1") %>% write_csv(path = "Maize/maize_chrom01_decrease_changed_missing_data.csv")
+maize_chrom02_decrease <- filter(mergedmaize, Chromosome == "2") %>% write_csv(path = "Maize/maize_chrom02_decrease_changed_missing_data.csv")
+maize_chrom03_decrease <- filter(mergedmaize, Chromosome == "3") %>% write_csv(path = "Maize/maize_chrom03_decrease_changed_missing_data.csv")
+maize_chrom04_decrease <- filter(mergedmaize, Chromosome == "4") %>% write_csv(path = "Maize/maize_chrom04_decrease_changed_missing_data.csv")
+maize_chrom05_decrease <- filter(mergedmaize, Chromosome == "5") %>% write_csv(path = "Maize/maize_chrom05_decrease_changed_missing_data.csv")
+maize_chrom06_decrease <- filter(mergedmaize, Chromosome == "6") %>% write_csv(path = "Maize/maize_chrom06_decrease_changed_missing_data.csv")
+maize_chrom07_decrease <- filter(mergedmaize, Chromosome == "7") %>% write_csv(path = "Maize/maize_chrom07_decrease_changed_missing_data.csv")
+maize_chrom08_decrease <- filter(mergedmaize, Chromosome == "8") %>% write_csv(path = "Maize/maize_chrom08_decrease_changed_missing_data.csv")
+maize_chrom09_decrease <- filter(mergedmaize, Chromosome == "9") %>% write_csv(path = "Maize/maize_chrom09_decrease_changed_missing_data.csv")
+maize_chrom10_decrease <- filter(mergedmaize, Chromosome == "10") %>% write_csv(path = "Maize/maize_chrom10_decrease_changed_missing_data.csv")
+```
+
+
+# Sort teosinte by increasing 'Position'
+```{r}
+mteosinte <- mteosinte[mixedorder(mteosinte$Position),]
+```
+
+# Create new files for each 'Chromosome'
+```{r}
+teosinte_chrom01_increase <- filter(mteosinte, Chromosome == "1") %>% write_csv(path = "Teosinte/teosinte_chrom01_increase.csv")
+teosinte_chrom02_increase <- filter(mteosinte, Chromosome == "2") %>% write_csv(path = "Teosinte/teosinte_chrom02_increase.csv")
+teosinte_chrom03_increase <- filter(mteosinte, Chromosome == "3") %>% write_csv(path = "Teosinte/teosinte_chrom03_increase.csv")
+teosinte_chrom04_increase <- filter(mteosinte, Chromosome == "4") %>% write_csv(path = "Teosinte/teosinte_chrom04_increase.csv")
+teosinte_chrom05_increase <- filter(mteosinte, Chromosome == "5") %>% write_csv(path = "Teosinte/teosinte_chrom05_increase.csv")
+teosinte_chrom06_increase <- filter(mteosinte, Chromosome == "6") %>% write_csv(path = "Teosinte/teosinte_chrom06_increase.csv")
+teosinte_chrom07_increase <- filter(mteosinte, Chromosome == "7") %>% write_csv(path = "Teosinte/teosinte_chrom07_increase.csv")
+teosinte_chrom08_increase <- filter(mteosinte, Chromosome == "8") %>% write_csv(path = "Teosinte/teosinte_chrom08_increase.csv")
+teosinte_chrom09_increase <- filter(mteosinte, Chromosome == "9") %>% write_csv(path = "Teosinte/teosinte_chrom09_increase.csv")
+teosinte_chrom10_increase <- filter(mteosinte, Chromosome == "10") %>% write_csv(path = "Teosinte/teosinte_chrom10_increase.csv")
+```
+
+# Sort teosinte by decreasing 'Position'
+```{r}
+mteosinte <- mteosinte[mixedorder(mteosinte$Position, decreasing = T),]
+```
+
+# Replace ?/? with -/-
+```{r}
+mteosinte <- apply(X = mteosinte, MARGIN = 2, FUN = as.character)
+mteosinte[mteosinte == "?/?"] <- "-/-"
+mteosinte <- as.data.frame(mteosinte)
+```
+
+# Create new files for each 'Chromosome'
+```{r}
+teosinte_chrom01_decrease <- filter(mteosinte, Chromosome == "1") %>% write_csv(path = "Teosinte/teosinte_chrom01_decrease_changed_missing_data.csv")
+teosinte_chrom02_decrease <- filter(mteosinte, Chromosome == "2") %>% write_csv(path = "Teosinte/teosinte_chrom02_decrease_changed_missing_data.csv")
+teosinte_chrom03_decrease <- filter(mteosinte, Chromosome == "3") %>% write_csv(path = "Teosinte/teosinte_chrom03_decrease_changed_missing_data.csv")
+teosinte_chrom04_decrease <- filter(mteosinte, Chromosome == "4") %>% write_csv(path = "Teosinte/teosinte_chrom04_decrease_changed_missing_data.csv")
+teosinte_chrom05_decrease <- filter(mteosinte, Chromosome == "5") %>% write_csv(path = "Teosinte/teosinte_chrom05_decrease_changed_missing_data.csv")
+teosinte_chrom06_decrease <- filter(mteosinte, Chromosome == "6") %>% write_csv(path = "Teosinte/teosinte_chrom06_decrease_changed_missing_data.csv")
+teosinte_chrom07_decrease <- filter(mteosinte, Chromosome == "7") %>% write_csv(path = "Teosinte/teosinte_chrom07_decrease_changed_missing_data.csv")
+teosinte_chrom08_decrease <- filter(mteosinte, Chromosome == "8") %>% write_csv(path = "Teosinte/teosinte_chrom08_decrease_changed_missing_data.csv")
+teosinte_chrom09_decrease <- filter(mteosinte, Chromosome == "9") %>% write_csv(path = "Teosinte/teosinte_chrom09_decrease_changed_missing_data.csv")
+teosinte_chrom10_decrease <- filter(mteosinte, Chromosome == "10") %>% write_csv(path = "Teosinte/teosinte_chrom10_decrease_changed_missing_data.csv")
+```
+
+## homozygous vs. heterozygous
+
+#Melt the original Fang file
+```{r}
+zygo_long <- filter(Fang, Group == "ZMMIL" | Group == "ZMMLR" | Group == "ZMMMR" | Group == "ZMPBA" | Group == "ZMPIL" | Group == "ZMPJA")
+zygo <- melt(zygo_long, measure.vars = colnames(Fang)[4:986])
+colnames(zygo)[4:5] <- c("SNP_ID", "Homozygous")
+colnames(zygo)
+```
+
+#Change all homozygous SNPs to TRUE
+```{r}
+zygo[zygo == "A/A"] <- TRUE
+zygo[zygo == "C/C"] <- TRUE
+zygo[zygo == "G/G"] <- TRUE
+zygo[zygo == "T/T"] <- TRUE
+```
+
+#Change all heterozygo to FALSE
+```{r}
+zygo[zygo == "A/C"] <- FALSE
+zygo[zygo == "A/G"] <- FALSE
+zygo[zygo == "A/T"] <- FALSE
+zygo[zygo == "C/G"] <- FALSE
+zygo[zygo == "C/T"] <- FALSE
+zygo[zygo == "G/T"] <- FALSE
+```
+
+#Change all missing values to NA
+```{r}
+zygo[zygo == "?/?"] <- NA
+```
+
+#Sort the dataframe using "Group" and "Species_ID"
+```{r}
+zygo <- arrange(zygo, Sample_ID, Group)
+```
+
+## Data Visualization
+
+# SNPs per chromosome
+```{r}
+ggplot(data = mergedFangSNP) +
+  geom_bar(mapping = aes(x = Chromosome)) +
+  scale_x_discrete(limits=c(1:10, "unknown", "multiple")) +
+  ggtitle(label = "SNPs per chromosome") +
+  xlab(label = "Chromosome") +
+  ylab(label = "Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 20),
+    axis.text = element_text(size = 15),
+    axis.title = element_text(size = 15)
+    ) 
+ggsave(filename = "graphs/SNPs per chromosome.png", device = "png")
+```
+
+# Missing data and amout of heterozygosity
+```{r}
+ggplot(data = zygo) +
+  geom_bar(mapping = aes(x = Homozygous, fill = Homozygous), stat = "count") +
+  ggtitle(label = "Total SNP Zygosity") +
+  ylab(label = "Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.position = "none"
+    )
+ggsave(filename = "graphs/Total SNP Zygosity.png", device = "png")
+```
+
+# SNPs per Group
+```{r}
+ggplot(data = Fang) + 
+  geom_bar(mapping = aes(x = Group)) +
+  ggtitle(label = "SNPs per Group") +
+  ylab("Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.text = element_text(size = 9),
+    axis.title = element_text(size = 12)
+    )
+ggsave(filename = "graphs/SNPs per Group.png", device = "png")
+```
+
+# SNP Zygosity by Sample_ID
+```{r}
+ggplot(data = zygo) +
+  geom_bar(mapping = aes(x = Sample_ID, fill = Homozygous), stat = "count") +
+  ggtitle(label = "SNP Zygosity by Ordered Sample_ID") +
+  ylab(label = "Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+    )
+ggsave(filename = "graphs/SNP Zygosity by Ordered Sample_ID.png", device = "png")
+```
+
+# SNP Zygosity by Group
+```{r}
+ggplot(data = zygo) +
+  geom_bar(mapping = aes(x = Group, fill = Homozygous), stat = "count") +
+  ggtitle(label = "SNP Zygosity by Group") +
+  xlab(label = "Chromosome") +
+  ylab(label = "Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12)
+    ) 
+ggsave(filename = "graphs/SNP Zygosity by Group.png", device = "png")
+```
+
+# Position Adjustment for SNP Zygosity by Group
+```{r}
+ggplot(data = zygo) + 
+  geom_bar(mapping = aes(x = Group, fill = Homozygous), position = "fill") +
+  ggtitle(label = "Position Adjustment for SNP Zygosity by Group") +
+  xlab(label = "Chromosome") +
+  ylab(label = "Number of SNPs") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 15),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 12)
+    )
+ggsave(filename = "graphs/Position Adjustment for SNP Zygosity by Group.png", device = "png")
+```
+
+## Additional visualization
+
+# Distribution of SNPs across chromosomes
+```{r}
+df <- mergedFangSNP %>% 
+    mutate(Dist_Bin = cut(as.numeric(Position), breaks = 20))
+df1 <- subset(df, Chromosome != "unknown")
+df2 <- subset(df1,  Chromosome != "NA")
+df3 <- subset(df2, Chromosome != "multiple")
+ggplot(data = df3) +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    axis.text.x = element_text(angle = 315, hjust = -0.02, size = 5)
+  ) +
+  facet_wrap(~Chromosome, scales = "free", nrow = 2) +
+  geom_bar(mapping = aes(x = Dist_Bin), stat = "count") +
+  ggtitle(label = "Distribution of SNPs across chromosomes") +
+  xlab(label = "Position Binned") +
+  ylab(label = "Number of SNPs")
+ggsave(filename = "graphs/Distribution of SNPs across chromosomes.png", device = "png")
+```

@@ -1,0 +1,201 @@
+---
+title: "R_assignment_LF"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+# Part I
+## Data Inspection
+
+### First, I am going to check if I am in the right working directory:
+
+```{r}
+getwd()
+```
+
+### Next, load the tidyverse package:
+```{r}
+library(tidyverse)
+```
+
+### Import data files and view them
+```{r}
+library(RCurl)
+x <- getURL('https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/fang_et_al_genotypes.txt')
+fang_genotypes <- read.delim(text = x)
+y <- getURL('https://raw.githubusercontent.com/EEOB-BioData/BCB546X-Fall2019/master/assignments/UNIX_Assignment/snp_position.txt')
+snp_position <- read.delim(text = y)
+```
+
+### Inspect files by using head() and tail() (I will not demonstrate here as it will take lots of space in the RMarkdown file). We can also determine the number of columns and rows using ncol() and nrow(), respectively. Use names() to list the headers in both files and class() to determine the class of the files.
+```{r}
+ncol(fang_genotypes)
+ncol(snp_position)
+nrow(fang_genotypes)
+nrow(snp_position)
+names(fang_genotypes)
+names(snp_position)
+class(fang_genotypes)
+class(snp_position)
+```
+### fang_genoytypes has 986 columns with 2782 rows (exluding the header), and snp_positions has 15 columns and 983 rows (excluding the header). Both files are data frames.
+
+### We can use summary() to provide us with statistics on the columns of the data frame. Note that I did not apply it on fang_genotypes since the number of columns is too large and the  summary is not very useful in this case.
+```{r}
+summary(snp_position)
+```
+
+
+## Data Processing
+
+### First, create a table containing only the "SNP_ID", "Chromosome", and "Position" columns:
+```{r}
+snps<-snp_position[c("SNP_ID","Chromosome", "Position")]
+view(snps)
+```
+
+### Next, use filter() to extract the rows containing the genotypes, and dim() to check the dimensions of the resulting data frames:
+```{r}
+maize <- filter(fang_genotypes, `Group` == "ZMMIL" | `Group` == "ZMMLR" | `Group` == "ZMMMR")
+teosinte <- filter(fang_genotypes, `Group` == "ZMPBA" | `Group` == "ZMPIL" | `Group` == "ZMPJA")
+dim(maize)
+dim(teosinte)
+```
+### So, the total maize genotypes extracted are 1573, while those of teosinte are 975. 
+
+
+### We can count the number of groups present in fang_genotypes using the following to check if the previous dimensions make sense by adding the ones corresponding to each maize or teosinte:
+```{r}
+fang_genotypes %>% group_by(Group) %>% summarize(count=n())
+```
+
+### To transpose the maize and teosinte data frames, use t()
+```{r}
+maize_t <- t(maize)
+teosinte_t <- t(teosinte)
+dim(maize_t)
+dim(teosinte_t)
+```
+### By looking at the dimensions of the data frames, we can confirm that they have been transposed successfully.
+
+### Use merge() to join the snps data frame with maize/teosinte genotypes:
+```{r}
+?merge()
+maize_snps <- merge(snps, maize_t, by.x = 1, by.y = 0, sort = TRUE)
+teosinte_snps <- merge(snps, teosinte_t, by.x = 1, by.y = 0, sort = TRUE)
+```
+
+### Sorting by increasing SNP position values with missing data encoded by "?" (not changed since missing data is already encoded by "?")
+```{r}
+for (i in 1:10){
+maize_temp <- filter(maize_snps, Chromosome == i )
+maize_increasing <- arrange(maize_temp, Position)
+write.table(maize_increasing, file = file.path("./Maize/Maize_increasing/", paste0("maize_chromosome_increasing_",i,".txt")), sep= "\t", row.names = FALSE)
+}
+```
+
+```{r}
+for (i in 1:10){
+teosinte_temp <- filter(teosinte_snps, Chromosome == i)
+teosinte_increasing <- arrange(teosinte_temp, Position)
+write.table(teosinte_increasing, file = file.path("./Teosinte/Teosinte_increasing/", paste0("teosinte_chromosome_increasing_",i,".txt")), sep="\t", row.names=FALSE)
+}
+
+```
+
+### Sorting by decreasing SNP position values with missing data encoded by "-"
+```{r}
+for (i in 1:10){
+maize_tempo <- filter(maize_snps, Chromosome == i)
+maize_tempor <- arrange(maize_tempo, desc(Position))
+maize_decreasing <- sapply(maize_tempor, gsub, pattern = "?", replacement = "-", fixed = TRUE)
+write.table(maize_decreasing, file = file.path("./Maize/Maize_decreasing/", paste0('maize_chromosome_decreasing_',i,'.txt')), sep='\t', row.names=FALSE)
+} 
+```
+
+```{r}
+for (i in 1:10){
+teosinte_tempo <- filter(teosinte_snps, Chromosome == i)
+teosinte_tempor <- arrange(teosinte_tempo, desc(Position))
+teosinte_decreasing <- sapply(teosinte_tempor, gsub, pattern = "?", replacement = "-", fixed = TRUE)
+write.table(teosinte_decreasing, file = file.path("./Teosinte/Teosinte_decreasing/", paste0('teosinte_chromosome_decreasing_',i,'.txt')), sep='\t', row.names=FALSE)
+} 
+```
+
+# Part II
+## Data Visualization
+
+## SNPs per Chromosome
+
+### First, load the required packages
+```{r}
+library(ggplot2)
+library(reshape2)
+```
+
+### Next, tidy data using pivot_longer
+```{r}
+genotypes <- t(fang_genotypes)
+genotypes_snps <- merge(snps, genotypes, by.x = 1, by.y = 0, sort = TRUE)
+```
+
+### Plotting the total number of SNPs on each chromosome
+```{r}
+ggplot(genotypes_snps) + geom_bar(aes(x=Chromosome, fill=(Chromosome))) + ggtitle("Number of SNPs/Chromosome") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="Chromosome",y="SNP Count")
+```
+
+### Plotting the distribution of SNPs on chromosomes
+```{r}
+ggplot(data = genotypes_snps, mapping=aes(x=Chromosome, y=Position))+
+     geom_point(alpha=0.1) + ggtitle("Distribution of SNPs on Chromosomes") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Missing Data and Amount of Heterozygosity
+```{r}
+melted_genotypes <- melt(fang_genotypes, id = c("Sample_ID", "Group"))
+melted_snps <- melt(snps, id = c("SNP_ID", "Chromosome"))
+colnames(melted_genotypes) [3:4] <- c("SNP_ID", "SNPname")
+geno_snps <- merge(melted_snps, melted_genotypes, by.x = 1, by.y = 3)
+geno_snps <- geno_snps[,-3]
+```
+
+```{r}
+geno_snps$SNPstatus <- "NA"
+geno_snps$SNPstatus <- geno_snps$SNPname
+geno_snps$SNPstatus[geno_snps$SNPname=="?/?"] <- "NA"
+geno_snps$SNPstatus[geno_snps$SNPname=="A/A" | geno_snps$SNPname=="C/C" | geno_snps$SNPname=="G/G" | geno_snps$SNPname=="T/T"] <- "Hom"
+geno_snps$SNPstatus [geno_snps$SNPstatus!="Hom" & geno_snps$SNPstatus!= "NA"] <- "Het"
+heterozygosity<-geno_snps
+```
+
+### Plotting Heterozygosity in the Chromosomes
+```{r}
+ggplot(data = heterozygosity) + 
+  geom_bar(mapping = aes(x =Chromosome, fill=SNPstatus)) + ggtitle("Heterozygosity in the Samples") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+### Plotting Heterozygosity Among Different Groups
+```{r}
+ggplot(heterozygosity) + geom_bar(aes(x=Group, fill=SNPstatus), position = "fill") + ggtitle("Heterozygosity Among Different Groups") + labs(x="Group",y="Quantity of the Different SNP Status ") +  theme(plot.title = element_text(hjust = 0.5))
+```
+
+### My Own Visualization
+```{r}
+maize_geno_snps <- filter(geno_snps, `Group` == "ZMMIL" | `Group` == "ZMMLR" | `Group` == "ZMMMR")
+ggplot(maize_geno_snps) + geom_bar(aes(x=Chromosome, fill=Group)) + ggtitle("Number of SNPs Found in each Maize Group Per Chromosome") + theme(plot.title = element_text(hjust = 0.5)) + labs(x="Chromosome",y="Number of SNPS/Group")
+```
+
+
+##Notes from Clayton
+#I really liked the 'distribution of SNPs on chromosomes' graph the most. It was really cool to see how you visualized the physical snp location along each chromosome. What would be really cool is if you could find a way to size each chromosome relative to its base length as well as color in the snps closest to the centromers for fun. 
+#I also think it is clever how you deduced the 'het' group buy omission of the hom and NA groups. 
+#Your for loops look really good to condense a lot of potnetial lines into one chunk.
+#I also think your final visualization is interesting potentially showing which group is under represented. 
+#Great Job! 
